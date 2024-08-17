@@ -1,0 +1,11 @@
+python-dotenv==1.0.0
+dspy==2.0.5
+transitions==0.9.0
+sentence-transformers==2.2.2
+torch==1.13.1
+requests==2.28.2
+loguru==0.7.0
+chromadb==0.3.29
+munch==3.0.0
+openai==0.27.8
+langsmith==0.0.30
