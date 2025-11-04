@@ -37,7 +37,7 @@ CRAB (Contextual Retrieval and Analysis Bot) is a sophisticated AI-powered conve
 To start CRAB, run:
 
 ```
-python crab_main.py
+python main.py
 ```
 
 Once CRAB is running, you can:
@@ -49,7 +49,7 @@ Once CRAB is running, you can:
 
 ## Project Structure
 
-- `crab_main.py`: Main script containing the CRAB implementation
+- `main.py`: Main script containing the CRAB implementation
 - `requirements.txt`: List of Python dependencies
 - `.env`: Environment variables (create this file and add your API keys)
 

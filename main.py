@@ -64,7 +64,8 @@ class EvaluateRetrieval(Signature):
     score = OutputField(desc="relevance score")
 
 class RAG(Module):
-    def __init__(self, directory, num_passages=3, chunk_size=512, max_files=100, mode='standard'):
+    def __init__(self, directory: str, num_passages: int = 3, chunk_size: int = 512,
+                 max_files: int = 100, mode: str = 'standard') -> None:
         super().__init__()
         self.directory = directory
         self.num_passages = num_passages
@@ -76,13 +77,13 @@ class RAG(Module):
         self.evaluate_retrieval = ChainOfThought(EvaluateRetrieval)
         self.retriever = self._initialize_retriever()
     
-    def _initialize_retriever(self):
+    def _initialize_retriever(self) -> 'ChromaDBRetriever':
         collection_name = "chatbot_system"
         persist_directory = data_dir()
         check_for_updates = True
         embed_fn = default_embed_fn
         k = 5
-        
+
         retriever = ChromaDBRetriever(
             directory=self.directory,
             collection_name=collection_name,
@@ -91,35 +92,35 @@ class RAG(Module):
             embed_fn=embed_fn,
             k=k
         )
-        
+
         return retriever
-    
-    def truncate_context(self, context, max_length=4000):
+
+    def truncate_context(self, context: str, max_length: int = 4000) -> str:
         """Truncate the context to ensure it doesn't exceed the maximum token length."""
         if len(context) > max_length:
             return context[:max_length]
         return context
-    
-    def clean_context(self, context):
+
+    def clean_context(self, context: str) -> str:
         """Clean the retrieved context to remove unwanted HTML or script content."""
         clean_text = re.sub(r'<script.*?>.*?</script>', '', context, flags=re.DOTALL)
         clean_text = re.sub(r'<.*?>', '', clean_text)
         return clean_text
     
     @traceable
-    def retrieve(self, query):
+    def retrieve(self, query: str) -> List[Any]:
         # Use the ChromaDBRetriever for enhanced retrieval
         relevant_results = self.retriever.forward(query, k=self.num_passages)
         return relevant_results
-    
+
     @traceable
-    def evaluate_retrieval_results(self, documents):
+    def evaluate_retrieval_results(self, documents: str) -> float:
         """Evaluate the quality of retrieved documents."""
         score = self.evaluate_retrieval(context=documents).score
         return score
-    
+
     @traceable
-    def decompose_then_recompose(self, documents):
+    def decompose_then_recompose(self, documents: str) -> str:
         """Refine the retrieved documents by decomposing and recomposing them."""
         knowledge_strips = []
         for doc in documents:
@@ -128,9 +129,9 @@ class RAG(Module):
                 if self.evaluate_retrieval_results(strip) > 0.5:
                     knowledge_strips.append(strip)
         return ' '.join(knowledge_strips)
-    
+
     @traceable
-    def web_search(self, query):
+    def web_search(self, query: str) -> List[str]:
         """Perform a web search for additional information using Jina AI's Reader API."""
         search_url = f"https://s.jina.ai/{query.replace(' ', '%20')}"
         try:
@@ -159,15 +160,6 @@ class RAG(Module):
 
         except requests.RequestException as req_err:
             logger.error(f"Web search failed: {req_err}")
-            return []
-
-    # Example usage:
-    # rag = RAG(directory=os.getcwd(), mode='web_search')
-    # results = rag.web_search("Roman Empire history")
-    # print(results)
-
-            logger.error(f"Failed to decode JSON response: {json_err}")
-            logger.debug(f"Response content: {response.text}")
             return []
 
     @traceable
@@ -314,10 +306,10 @@ class ChromaDBRetriever:
 class GeneralInterpreter(Machine):
     states = ['start', 'thinking', 'acting', 'observing', 'concluded']
 
-    def __init__(self, llm, memory_size=5, mode='standard'):
+    def __init__(self, llm: Any, memory_size: int = 5, mode: str = 'standard') -> None:
         super().__init__(states=GeneralInterpreter.states, initial='start')
         self.llm = llm
-        self.memory = []
+        self.memory: List[str] = []
         self.memory_size = memory_size
         self.tools = {
             "current_directory": self.get_current_directory,
@@ -339,7 +331,7 @@ class GeneralInterpreter(Machine):
         self.add_transition(trigger='restart', source='observing', dest='start')
         self.add_transition(trigger='observe', source='thinking', dest='observing')
 
-    def get_current_directory(self):
+    def get_current_directory(self) -> str:
         """Return the current working directory."""
         try:
             current_dir = os.getcwd()
@@ -347,7 +339,7 @@ class GeneralInterpreter(Machine):
         except Exception as e:
             return f"Error: {str(e)}"
 
-    def list_directory_contents(self):
+    def list_directory_contents(self) -> Union[List[str], str]:
         """Return the contents of the current directory."""
         try:
             contents = os.listdir()
@@ -355,7 +347,7 @@ class GeneralInterpreter(Machine):
         except Exception as e:
             return f"Error: {str(e)}"
 
-    def change_directory(self, directory):
+    def change_directory(self, directory: str) -> str:
         """Change the current working directory."""
         try:
             os.chdir(directory)
@@ -363,7 +355,7 @@ class GeneralInterpreter(Machine):
         except Exception as e:
             return f"Error: {str(e)}"
 
-    def read_file(self, file_path):
+    def read_file(self, file_path: str) -> str:
         """Read the contents of a file."""
         try:
             with open(file_path, 'r') as file:
@@ -372,7 +364,7 @@ class GeneralInterpreter(Machine):
         except Exception as e:
             return f"Error: {str(e)}"
 
-    def execute_shell_command(self, command):
+    def execute_shell_command(self, command: str) -> tuple[str, str]:
         try:
             result = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             stdout = result.stdout.decode('utf-8')
@@ -381,7 +373,7 @@ class GeneralInterpreter(Machine):
         except subprocess.CalledProcessError as e:
             return e.stdout.decode('utf-8'), e.stderr.decode('utf-8')
 
-    def tool_function(self, command, *args):
+    def tool_function(self, command: str, *args) -> Any:
         if command in self.tools:
             result = self.tools[command](*args)
             self.memory.append(f"Tool result for {command}: {result}")
@@ -389,7 +381,7 @@ class GeneralInterpreter(Machine):
         else:
             return "Tool function not recognized."
 
-    def set_mode(self, mode):
+    def set_mode(self, mode: str) -> None:
         """Set the mode for the RAG module."""
         if mode in ['standard', 'web_search']:
             self.mode = mode
@@ -398,7 +390,7 @@ class GeneralInterpreter(Machine):
         else:
             print("Invalid mode. Please choose either 'standard' or 'web_search'.")
 
-    def chat(self):
+    def chat(self) -> None:
         print("Hello! How can I help you today?")
         while True:
             user_input = input("You: ")
@@ -414,11 +406,11 @@ class GeneralInterpreter(Machine):
             else:
                 self.handle_general_command(user_input)
 
-    def handle_general_command(self, user_input):
+    def handle_general_command(self, user_input: str) -> None:
         try:
             if self.state == 'start':
                 self.trigger('think')
-            
+
             if self.state == 'thinking':
                 # Step 1: Retrieve relevant documents from ChromaDB
                 retrieved_results = self.rag.retrieve(user_input)
@@ -431,7 +423,7 @@ class GeneralInterpreter(Machine):
                 # Step 2: Pass the retrieved documents to the CRAG system
                 context = " ".join(retrieved_docs)
                 pred = self.rag(question=user_input, context=context)
-                
+
                 print(f"AI Response: {pred.answer}")
                 print(f"Files used for generating the answer: {', '.join(file_names)}")
                 self.memory.append(pred.answer)
@@ -450,13 +442,13 @@ class GeneralInterpreter(Machine):
         except Exception as e:
             print(f"Error: {e}")
 
-    def is_tool_command(self, user_input):
+    def is_tool_command(self, user_input: str) -> bool:
         """Detects if the user input should trigger a tool function call."""
         tool_commands = ['current dir', 'contents of this directory', 'list files', 'list directory', 'current directory',
                          'change directory', 'read file']
         return any(cmd in user_input.lower() for cmd in tool_commands)
 
-    def handle_tool_command(self, user_input):
+    def handle_tool_command(self, user_input: str) -> Any:
         """Handles the execution of tool commands based on user input."""
         if 'current dir' in user_input.lower() or 'current directory' in user_input.lower():
             return self.tool_function("current_directory")
